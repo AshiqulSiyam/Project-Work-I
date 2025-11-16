@@ -385,14 +385,56 @@ void drawMap() {
     WriteConsoleOutputCharacter(hConsole, scoreText, strlen(scoreText), (COORD){0, ROWS}, &count);
 }
 
-// Simple wrapper to play a WAV file asynchronously.
-// Place coin.wav, death.wav and eat_enemy.wav in the same folder as the executable.
-// If PlaySound fails, a short Beep is used as fallback so there is always feedback.
-void playSoundFile(const char* filename) {
-    if (!PlaySoundA(filename, NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT)) {
-        // fallback beep
-        Beep(800, 120);
+// Enhanced sound function with better path handling and fallback sounds
+// Place coin.wav, death.wav, eat_enemy.wav, and power_pellet.wav in the same folder as the executable.
+// If files don't exist, programmatic beeps are used as fallback.
+void playSoundFile(const char* filename, int fallbackFreq, int fallbackDuration) {
+    char fullPath[MAX_PATH];
+    char exePath[MAX_PATH];
+    
+    // Get the directory where the executable is located
+    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    char* lastSlash = strrchr(exePath, '\\');
+    if (lastSlash) {
+        *lastSlash = '\0';
+        sprintf(fullPath, "%s\\%s", exePath, filename);
+    } else {
+        strcpy(fullPath, filename);
     }
+    
+    // Try to play the sound file
+    BOOL soundPlayed = PlaySoundA(fullPath, NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
+    
+    // If file doesn't exist or PlaySound failed, try current directory
+    if (!soundPlayed) {
+        soundPlayed = PlaySoundA(filename, NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
+    }
+    
+    // If still failed, use fallback beep
+    if (!soundPlayed) {
+        Beep(fallbackFreq, fallbackDuration);
+    }
+}
+
+// Convenience functions for different sound effects
+void playCoinSound() {
+    playSoundFile("coin.wav", 800, 100);  // High pitch, short beep
+}
+
+void playPowerPelletSound() {
+    playSoundFile("power_pellet.wav", 1000, 150);  // Higher pitch, longer beep
+}
+
+void playEatEnemySound() {
+    playSoundFile("eat_enemy.wav", 600, 200);  // Lower pitch, longer beep
+}
+
+void playDeathSound() {
+    playSoundFile("death.wav", 300, 500);  // Very low pitch, long beep
+}
+
+void playMoveSound() {
+    playSoundFile("move.wav", 400, 50);  // Very short, low beep for movement
 }
 
 void movePacman(char dir) {
@@ -406,17 +448,20 @@ void movePacman(char dir) {
         if (map[newX][newY] == '.') {
             score += 10;
             map[newX][newY] = ' ';
-            // play coin sound (coin.wav)
-            playSoundFile("coin.wav");
+            // play coin sound
+            playCoinSound();
         } else if (map[newX][newY] == 'O') {
             score += 50;
             map[newX][newY] = ' ';
             powerPelletActive = 1;
             powerPelletTimer = POWER_PELLET_TIME;
             enemyVulnerable = true;
-            // play power pellet sound (optional reuse coin.wav)
-            playSoundFile("coin.wav");
+            // play power pellet sound
+            playPowerPelletSound();
         }
+        // Note: Movement sound removed to avoid excessive beeping
+        // Uncomment the line below if you want movement sounds
+        // playMoveSound();
         pacX = newX;
         pacY = newY;
     }
@@ -494,11 +539,11 @@ void checkGameStatus() {
             enemyX = ROWS / 2;
             enemyY = COLS / 2;
             // play enemy eaten sound
-            playSoundFile("eat_enemy.wav");
+            playEatEnemySound();
             return;
         } else {
             // play death sound
-            playSoundFile("death.wav");
+            playDeathSound();
             gameOver = 1;
             return;
         }
