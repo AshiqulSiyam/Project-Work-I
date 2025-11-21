@@ -160,6 +160,8 @@ int score = 0;
 int powerPelletActive = 0;
 int powerPelletTimer = 0;
 
+void playLoginSound();
+
 void setColor(int color) {
     SetConsoleTextAttribute(hConsole, color);
 }
