@@ -332,7 +332,7 @@ void initGameConsole() {
     SetConsoleActiveScreenBuffer(hConsole);
     CONSOLE_CURSOR_INFO cursorInfo = {1, FALSE};
     SetConsoleCursorInfo(hConsole, &cursorInfo);
-    SetConsoleTitle("PAC MAN Game");
+    SetConsoleTitle("THE GHOST Game");
 }
 
 void initializeDots() {
