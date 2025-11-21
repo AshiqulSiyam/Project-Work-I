@@ -357,6 +357,7 @@ int loginUser() {
     setColor(COLOR_GREEN);
     printCentered("Login successful!\n");
     setColor(COLOR_WHITE);
+    playLoginSound();
     Sleep(1500);
 
     return userIndex;
@@ -439,7 +440,6 @@ void showMainMenu() {
 
         switch (choice) {
             case 1:
-                playLoginSound();
                 currentUser = loginUser();
                 if (currentUser != -1) return;
                 break;
@@ -754,13 +754,12 @@ void resetGame() {
     gameOver = 0;
     powerPelletActive = 0;
     powerPelletTimer = 0;
-    initializeDots();
 }
 
 void playGame() {
     srand((unsigned int)time(NULL));
-    initializeDots();
     initGameConsole();
+    initializeDots();
     resetGame();
 
     while (!gameOver) {
