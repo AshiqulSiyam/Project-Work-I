@@ -507,19 +507,39 @@ void drawMap() {
 
     for (int i = 0; i < ROWS; i++) {
         for (int j = 0; j < COLS; j++) {
-            buffer[i * COLS + j].Char.AsciiChar =
-                (i == pacX && j == pacY) ? 'p' :
-                (i == enemyX && j == enemyY) ? (enemyVulnerable ? 'V' : 'M') :
-                (map[i][j] == '.') ? '.' :
-                (map[i][j] == 'O') ? 'O' :
-                (map[i][j] == '#') ? 219 : ' ';
-
-            buffer[i * COLS + j].Attributes =
-                (i == pacX && j == pacY) ? COLOR_YELLOW :
-                (i == enemyX && j == enemyY) ? (enemyVulnerable ? COLOR_CYAN : COLOR_RED) :
-                (map[i][j] == '#') ? COLOR_BLUE :
-                (map[i][j] == '.') ? COLOR_WHITE :
-                (map[i][j] == 'O') ? COLOR_MAGENTA : 0;
+            char displayChar = ' ';
+            int color = 0;
+            
+            if (i == pacX && j == pacY) {
+                displayChar = 'p';
+                color = COLOR_YELLOW;
+            } else {
+                bool enemyHere = false;
+                for (int e = 0; e < numEnemies; e++) {
+                    if (i == enemyX[e] && j == enemyY[e]) {
+                        displayChar = enemyVulnerable[e] ? 'V' : 'M';
+                        color = enemyVulnerable[e] ? COLOR_CYAN : COLOR_RED;
+                        enemyHere = true;
+                        break;
+                    }
+                }
+                
+                if (!enemyHere) {
+                    if (map[i][j] == '.') {
+                        displayChar = '.';
+                        color = COLOR_WHITE;
+                    } else if (map[i][j] == 'O') {
+                        displayChar = 'O';
+                        color = COLOR_MAGENTA;
+                    } else if (map[i][j] == '#') {
+                        displayChar = 219;
+                        color = COLOR_BLUE;
+                    }
+                }
+            }
+            
+            buffer[i * COLS + j].Char.AsciiChar = displayChar;
+            buffer[i * COLS + j].Attributes = color;
         }
     }
 
@@ -610,7 +630,9 @@ void movePacman(char dir) {
             map[newX][newY] = ' ';
             powerPelletActive = 1;
             powerPelletTimer = POWER_PELLET_TIME;
-            enemyVulnerable = true;
+            for (int i = 0; i < numEnemies; i++) {
+                enemyVulnerable[i] = true;
+            }
             // play power pellet sound
             playPowerPelletSound();
         }
@@ -622,85 +644,84 @@ void movePacman(char dir) {
     }
 }
 
-void moveEnemy() {
-    // Update power pellet timer
+void moveEnemies() {
     if (powerPelletActive) {
         powerPelletTimer--;
         if (powerPelletTimer <= 0) {
             powerPelletActive = 0;
-            enemyVulnerable = false;
+            for (int i = 0; i < numEnemies; i++) {
+                enemyVulnerable[i] = false;
+            }
         }
     }
 
-    // If vulnerable, sometimes flee instead of chase
-    if (enemyVulnerable && rand() % 100 < 40) {
-        int dx = (pacX > enemyX) ? -1 : (pacX < enemyX) ? 1 : 0;
-        int dy = (pacY > enemyY) ? -1 : (pacY < enemyY) ? 1 : 0;
+    for (int e = 0; e < numEnemies; e++) {
+        if (enemyVulnerable[e] && rand() % 100 < 40) {
+            int dx = (pacX > enemyX[e]) ? -1 : (pacX < enemyX[e]) ? 1 : 0;
+            int dy = (pacY > enemyY[e]) ? -1 : (pacY < enemyY[e]) ? 1 : 0;
 
-        if (abs(dy) > 0 && map[enemyX][enemyY + dy] != '#') {
-            enemyY += dy;
-            return;
+            if (abs(dy) > 0 && map[enemyX[e]][enemyY[e] + dy] != '#') {
+                enemyY[e] += dy;
+                continue;
+            }
+            if (abs(dx) > 0 && map[enemyX[e] + dx][enemyY[e]] != '#') {
+                enemyX[e] += dx;
+                continue;
+            }
         }
-        if (abs(dx) > 0 && map[enemyX + dx][enemyY] != '#') {
-            enemyX += dx;
-            return;
+        else if (rand() % 100 < 70) {
+            int dx = (pacX > enemyX[e]) ? 1 : (pacX < enemyX[e]) ? -1 : 0;
+            int dy = (pacY > enemyY[e]) ? 1 : (pacY < enemyY[e]) ? -1 : 0;
+
+            if (abs(dy) > 0 && map[enemyX[e]][enemyY[e] + dy] != '#') {
+                enemyY[e] += dy;
+                continue;
+            }
+            if (abs(dx) > 0 && map[enemyX[e] + dx][enemyY[e]] != '#') {
+                enemyX[e] += dx;
+                continue;
+            }
         }
-    }
-    // Normal chasing behavior
-    else if (rand() % 100 < 70) {
-        int dx = (pacX > enemyX) ? 1 : (pacX < enemyX) ? -1 : 0;
-        int dy = (pacY > enemyY) ? 1 : (pacY < enemyY) ? -1 : 0;
 
-        if (abs(dy) > 0 && map[enemyX][enemyY + dy] != '#') {
-            enemyY += dy;
-            return;
+        int directions[4][2] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+        int order[4] = {0, 1, 2, 3};
+
+        for (int i = 0; i < 4; i++) {
+            int j = rand() % 4;
+            int temp = order[i];
+            order[i] = order[j];
+            order[j] = temp;
         }
-        if (abs(dx) > 0 && map[enemyX + dx][enemyY] != '#') {
-            enemyX += dx;
-            return;
-        }
-    }
 
-    // Random movement if no clear path
-    int directions[4][2] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
-    int order[4] = {0, 1, 2, 3};
+        for (int i = 0; i < 4; i++) {
+            int newX = enemyX[e] + directions[order[i]][0];
+            int newY = enemyY[e] + directions[order[i]][1];
 
-    for (int i = 0; i < 4; i++) {
-        int j = rand() % 4;
-        int temp = order[i];
-        order[i] = order[j];
-        order[j] = temp;
-    }
-
-    for (int i = 0; i < 4; i++) {
-        int newX = enemyX + directions[order[i]][0];
-        int newY = enemyY + directions[order[i]][1];
-
-        if (newX >= 0 && newX < ROWS && newY >= 0 && newY < COLS &&
-            map[newX][newY] != '#') {
-            enemyX = newX;
-            enemyY = newY;
-            return;
+            if (newX >= 0 && newX < ROWS && newY >= 0 && newY < COLS &&
+                map[newX][newY] != '#') {
+                enemyX[e] = newX;
+                enemyY[e] = newY;
+                break;
+            }
         }
     }
 }
 
 void checkGameStatus() {
-    // Check if enemy caught pacman
-    if (pacX == enemyX && pacY == enemyY) {
-        if (enemyVulnerable) {
-            // Eat the enemy
-            score += 200;
-            enemyX = ROWS / 2;
-            enemyY = COLS / 2;
-            // play enemy eaten sound
-            playEatEnemySound();
-            return;
-        } else {
-            // play death sound
-            playDeathSound();
-            gameOver = 1;
-            return;
+    for (int e = 0; e < numEnemies; e++) {
+        if (pacX == enemyX[e] && pacY == enemyY[e]) {
+            if (enemyVulnerable[e]) {
+                score += 200;
+                enemyX[e] = 5 + e * 3;
+                enemyY[e] = 5 + e * 8;
+                enemyVulnerable[e] = false;
+                playEatEnemySound();
+                return;
+            } else {
+                playDeathSound();
+                gameOver = 1;
+                return;
+            }
         }
     }
 
@@ -723,12 +744,16 @@ void checkGameStatus() {
 
 void resetGame() {
     pacX = 1; pacY = 1;
-    enemyX = 5; enemyY = 5;
+    int startPositions[5][2] = {{7, 7}, {15, 30}, {25, 40}, {10, 35}, {20, 15}};
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        enemyX[i] = startPositions[i][0];
+        enemyY[i] = startPositions[i][1];
+        enemyVulnerable[i] = false;
+    }
     score = 0;
     gameOver = 0;
     powerPelletActive = 0;
     powerPelletTimer = 0;
-    enemyVulnerable = false;
     initializeDots();
 }
 
@@ -747,7 +772,7 @@ void playGame() {
             movePacman(input);
         }
 
-        moveEnemy();
+        moveEnemies();
         checkGameStatus();
         Sleep(200);
     }
