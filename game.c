@@ -38,7 +38,17 @@ User users[MAX_USERS];
 int userCount = 0;
 int currentUser = -1;
 
-char map[ROWS][COLS + 1] = {
+// Difficulty system
+typedef enum {
+    EASY = 1,
+    MEDIUM = 2,
+    HARD = 3
+} Difficulty;
+
+Difficulty currentDifficulty = EASY;
+int numEnemies = 1;
+
+char easyMap[ROWS][COLS + 1] = {
     "############################################################",
     "#                                                          #",
     "#   ##################     ######    ###################   #",
@@ -71,13 +81,84 @@ char map[ROWS][COLS + 1] = {
     "############################################################"
 };
 
+char mediumMap[ROWS][COLS + 1] = {
+    "############################################################",
+    "#                                                          #",
+    "# ####  ####  ####  ####  ####  ####  ####  ####  ####  # #",
+    "#      #    #      #    #      #    #      #    #      #   #",
+    "# #### # ## # #### # ## # #### # ## # #### # ## # #### ### #",
+    "#      #    #      #    #      #    #      #    #      #   #",
+    "# #### #### #### #### #### #### #### #### #### #### #### # #",
+    "#                                                          #",
+    "# #### #### #### #### #### #### #### #### #### #### #### # #",
+    "#    #      #    #      #    #      #    #      #    #     #",
+    "# ## # #### # ## # #### # ## # #### # ## # #### # ## # ### #",
+    "#    #      #    #      #    #      #    #      #    #     #",
+    "# #### #### #### #### #### #### #### #### #### #### #### # #",
+    "#                                                          #",
+    "# #### #### #### #### #### #### #### #### #### #### #### # #",
+    "#    #      #    #      #    #      #    #      #    #     #",
+    "# ## # #### # ## # #### # ## # #### # ## # #### # ## # ### #",
+    "#    #      #    #      #    #      #    #      #    #     #",
+    "# #### #### #### #### #### #### #### #### #### #### #### # #",
+    "#                                                          #",
+    "# #### #### #### #### #### #### #### #### #### #### #### # #",
+    "#    #      #    #      #    #      #    #      #    #     #",
+    "# ## # #### # ## # #### # ## # #### # ## # #### # ## # ### #",
+    "#    #      #    #      #    #      #    #      #    #     #",
+    "# #### #### #### #### #### #### #### #### #### #### #### # #",
+    "#                                                          #",
+    "# #### #### #### #### #### #### #### #### #### #### #### # #",
+    "#                                                          #",
+    "#                                                          #",
+    "############################################################"
+};
+
+char hardMap[ROWS][COLS + 1] = {
+    "############################################################",
+    "#                                                          #",
+    "###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###",
+    "#  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ## #",
+    "# ### ### ### ### ### ### ### ### ### ### ### ### ### ### #",
+    "#  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ## #",
+    "###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###",
+    "#                                                          #",
+    "###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###",
+    "#  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ## #",
+    "# ### ### ### ### ### ### ### ### ### ### ### ### ### ### #",
+    "#  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ## #",
+    "###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###",
+    "#                                                          #",
+    "###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###",
+    "#  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ## #",
+    "# ### ### ### ### ### ### ### ### ### ### ### ### ### ### #",
+    "#  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ## #",
+    "###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###",
+    "#                                                          #",
+    "###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###",
+    "#  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ## #",
+    "# ### ### ### ### ### ### ### ### ### ### ### ### ### ### #",
+    "#  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ##  ## #",
+    "###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###",
+    "#                                                          #",
+    "###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###  ###",
+    "#                                                          #",
+    "#                                                          #",
+    "############################################################"
+};
+
+char map[ROWS][COLS + 1];
+
+#define MAX_ENEMIES 5
+int enemyX[MAX_ENEMIES] = {7, 15, 25, 10, 20};
+int enemyY[MAX_ENEMIES] = {7, 30, 40, 35, 15};
+bool enemyVulnerable[MAX_ENEMIES] = {false, false, false, false, false};
+
 int pacX = 1, pacY = 1;
-int enemyX = 7, enemyY = 7;
 int gameOver = 0;
 int score = 0;
 int powerPelletActive = 0;
 int powerPelletTimer = 0;
-bool enemyVulnerable = false;
 
 void setColor(int color) {
     SetConsoleTextAttribute(hConsole, color);
@@ -130,7 +211,12 @@ void loadUsers() {
 void saveUsers() {
     FILE* file = fopen("users.dat", "wb");
     if (file) {
-        fwrite(users, sizeof(User), userCount, file);
+        size_t written = fwrite(users, sizeof(User), userCount, file);
+        if (written != userCount) {
+            setColor(COLOR_RED);
+            printf("Error: Incomplete data write!\n");
+            setColor(COLOR_WHITE);
+        }
         fclose(file);
     } else {
         setColor(COLOR_RED);
@@ -157,7 +243,7 @@ void getPasswordInput(char* password) {
                 printf("\b \b");
                 i--;
             }
-        } else {
+        } else if (ch >= 32 && ch <= 126) { // Only printable ASCII
             password[i++] = ch;
             printf("*");
         }
@@ -276,6 +362,56 @@ int loginUser() {
     return userIndex;
 }
 
+int selectDifficulty() {
+    int choice;
+    char input[10];
+
+    do {
+        clearScreen();
+        printHeader();
+
+        setColor(COLOR_CYAN);
+        printCentered("=== SELECT DIFFICULTY ===\n\n");
+        setColor(COLOR_WHITE);
+
+        setColor(COLOR_GREEN);
+        printCentered("1. Easy   - 1 Enemy\n");
+        setColor(COLOR_YELLOW);
+        printCentered("2. Medium - 2 Enemies\n");
+        setColor(COLOR_RED);
+        printCentered("3. Hard   - 5 Enemies\n\n");
+        setColor(COLOR_WHITE);
+
+        printCentered("Enter your choice (1-3): ");
+        setColor(COLOR_MAGENTA);
+        fgets(input, sizeof(input), stdin);
+        char *endptr;
+        choice = (int)strtol(input, &endptr, 10);
+        if (endptr == input || *endptr != '\n') choice = 0;
+        setColor(COLOR_WHITE);
+
+        switch (choice) {
+            case 1:
+                currentDifficulty = EASY;
+                numEnemies = 1;
+                return 1;
+            case 2:
+                currentDifficulty = MEDIUM;
+                numEnemies = 2;
+                return 1;
+            case 3:
+                currentDifficulty = HARD;
+                numEnemies = 5;
+                return 1;
+            default:
+                setColor(COLOR_RED);
+                printCentered("Invalid choice! Please enter 1-3.\n");
+                setColor(COLOR_WHITE);
+                Sleep(1000);
+        }
+    } while (1);
+}
+
 void showMainMenu() {
     int choice;
     char input[10];
@@ -296,11 +432,14 @@ void showMainMenu() {
         printCentered("Enter your choice: ");
         setColor(COLOR_YELLOW);
         fgets(input, sizeof(input), stdin);
-        choice = atoi(input);
+        char *endptr;
+        choice = (int)strtol(input, &endptr, 10);
+        if (endptr == input || *endptr != '\n') choice = 0;
         setColor(COLOR_WHITE);
 
         switch (choice) {
             case 1:
+                playLoginSound();
                 currentUser = loginUser();
                 if (currentUser != -1) return;
                 break;
@@ -321,6 +460,16 @@ void showMainMenu() {
     } while (1);
 }
 
+void loadMap() {
+    if (currentDifficulty == EASY) {
+        memcpy(map, easyMap, sizeof(easyMap));
+    } else if (currentDifficulty == MEDIUM) {
+        memcpy(map, mediumMap, sizeof(mediumMap));
+    } else {
+        memcpy(map, hardMap, sizeof(hardMap));
+    }
+}
+
 void initGameConsole() {
     hConsole = CreateConsoleScreenBuffer(
         GENERIC_READ | GENERIC_WRITE,
@@ -336,6 +485,7 @@ void initGameConsole() {
 }
 
 void initializeDots() {
+    loadMap();
     for (int i = 0; i < ROWS; i++) {
         for (int j = 0; j < COLS; j++) {
             if (map[i][j] == ' ') {
@@ -377,7 +527,7 @@ void drawMap() {
     WriteConsoleOutput(hConsole, buffer, (COORD){COLS, ROWS}, coord, &rect);
 
     char scoreText[200];
-    sprintf(scoreText, "Score: %d | Highscore: %d | Player: %s | W,A,S,D to move | Q to quit | Power: %d",
+    snprintf(scoreText, sizeof(scoreText), "Score: %d | Highscore: %d | Player: %s | W,A,S,D to move | Q to quit | Power: %d",
             score,
             (currentUser != -1) ? users[currentUser].highscore : 0,
             (currentUser != -1) ? users[currentUser].username : "Guest",
@@ -397,9 +547,10 @@ void playSoundFile(const char* filename, int fallbackFreq, int fallbackDuration)
     char* lastSlash = strrchr(exePath, '\\');
     if (lastSlash) {
         *lastSlash = '\0';
-        sprintf(fullPath, "%s\\%s", exePath, filename);
+        snprintf(fullPath, MAX_PATH, "%s\\%s", exePath, filename);
     } else {
-        strcpy(fullPath, filename);
+        strncpy(fullPath, filename, MAX_PATH - 1);
+        fullPath[MAX_PATH - 1] = '\0';
     }
     
     // Try to play the sound file
@@ -435,6 +586,10 @@ void playDeathSound() {
 
 void playMoveSound() {
     playSoundFile("move.wav", 400, 50);  // Very short, low beep for movement
+}
+
+void playLoginSound() {
+    playSoundFile("login.wav", 500, 200);  // Medium pitch, short beep for login
 }
 
 void movePacman(char dir) {
@@ -630,6 +785,7 @@ int main() {
 
     while (1) {
         showMainMenu();
+        selectDifficulty();
         playGame();
     }
 
